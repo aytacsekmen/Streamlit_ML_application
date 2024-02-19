@@ -2,19 +2,25 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.decomposition import PCA
+
+import tensorflow as tf
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
+import xgboost as xgb
 from sklearn.model_selection import GridSearchCV
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import RobustScaler
+from keras.layers import Dense
+from keras.losses import BinaryCrossentropy
+from keras.models import Sequential
+from keras import regularizers
+from keras.optimizers import Adam
 
 from sklearn.metrics import accuracy_score,f1_score,precision_score,recall_score,confusion_matrix
-import time
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -22,49 +28,34 @@ import matplotlib.pyplot as plt
 
 class App:
     def __init__(self):
-        self.dataset_name = None
-        self.classifier_name = None
-        self.Init_Streamlit_Page()
-
-        self.params = dict()
-        self.clf = None
-        self.X, self.y = None, None
+        self.initialize()
     def run(self):
         if self.uploaded_file is not None:
-            self.get_dataset()
+            self.processing_on_dataset()
             self.apply_preprocessing()
-            #self.add_parameter_ui()
-            self.generate()
+            self.create_model()
         else:
-            st.write('<h1><span style="color: red;">Please Choose your Dataset First</span></h1>', unsafe_allow_html=True)
-    def Init_Streamlit_Page(self):
-        #st.title('Streamlit Example')
-#
+            st.write('<h1><span style="color: red;">Please Choose your Dataset At First</span></h1>', unsafe_allow_html=True)
+    def initialize(self):
         #st.write("""
-        ## Explore different classifier and datasets
-        #Which one is the best?
-        #""")
-        st.write("""
-                     <script>
-                         document.querySelector("[accept='']").setAttribute("accept", ".csv");
-                     </script>
-                 """, unsafe_allow_html=True)
-        self.uploaded_file = st.sidebar.file_uploader("Upload a file", type=["csv"],accept_multiple_files=False)
-        #self.dataset_name = st.sidebar.selectbox(
-        #    'Select Dataset',
-        #    ('Breast Cancer',)
-        #)
-        
+        #             <script>
+        #                 document.querySelector("[accept='']").setAttribute("accept", ".csv");
+        #             </script>
+        #         """, unsafe_allow_html=True)
+        self.uploaded_file = st.sidebar.file_uploader("Upload the data file", type=["csv"],accept_multiple_files=False)        
 
+        
+        # Hocam amaç projeyi ne kadar geliştirdiğimiz de olduğu için ben de 3 tane algoritmayla sınırlı kalmayıp diğer algoritmaları
+        # da ekledim ödeve
         self.classifier_name = st.sidebar.selectbox(
-            'Select classifier',
-            ('KNN', 'SVM', "Naive Bayes", 'Random Forest')
+            'Select the Algorithm',
+            ('KNN', 'SVM', "Naive Bayes", 'Random Forest',"XGBoost","Neural Network")
         )
-        self.normalization_name = st.sidebar.selectbox(
-            'Select Normalization Method',
-            ('Nothing',"Z-Score Normalization","Min-Max Scaling", "Robust Scaling")
-        )
-    def get_dataset(self):
+        #self.normalization_name = st.sidebar.selectbox(
+        #    'Select Normalization Method',
+        #    ('Nothing',"Z-Score Normalization","Min-Max Scaling", "Robust Scaling")
+        #)
+    def processing_on_dataset(self):
 
         if self.uploaded_file is not None:
             st.title("Breast Cancer Dataset Analysis")
@@ -92,11 +83,8 @@ class App:
             st.write("### X'in Boyutu: ", self.X.shape)
             st.write("### Y'deki class sayısı: ", len(np.unique(self.y)))
             #st.write(text_html_y,self.y,unsafe_allow_html=True)
-            
-
-            
-            
-
+        
+        
             st.markdown("---")
             st.write("# Correlation Matrix using Scatter Plot")
 
@@ -136,56 +124,63 @@ class App:
             st.markdown("---")
             
     def apply_preprocessing(self):
-        if self.normalization_name == 'Z-Score Normalization':
-            scaler = StandardScaler()
-            df_normalized = scaler.fit_transform(self.X)
-            self.X = pd.DataFrame(df_normalized, columns=self.X.columns)
-        elif self.normalization_name == 'Min-Max Scaling':
+        #if self.normalization_name == 'Z-Score Normalization':
+        #    scaler = StandardScaler()
+        #    df_normalized = scaler.fit_transform(self.X)
+        #    self.X = pd.DataFrame(df_normalized, columns=self.X.columns)
+        #elif self.normalization_name == 'Min-Max Scaling':
+        #    scaler=MinMaxScaler()
+        #    df_normalized = scaler.fit_transform(self.X)
+        #    self.X = pd.DataFrame(df_normalized, columns=self.X.columns)
+        #elif self.normalization_name == 'Robust Scaling':
+        #    scaler=RobustScaler()
+        #    df_normalized = scaler.fit_transform(self.X)
+        #    self.X = pd.DataFrame(df_normalized, columns=self.X.columns)
+        #elif self.normalization_name == 'Nothing':
+        #    pass
+        
+        if self.classifier_name == 'KNN':
             scaler=MinMaxScaler()
             df_normalized = scaler.fit_transform(self.X)
             self.X = pd.DataFrame(df_normalized, columns=self.X.columns)
-        elif self.normalization_name == 'Robust Scaling':
-            scaler=RobustScaler()
+        elif self.classifier_name == 'SVM':
+            scaler = StandardScaler()
             df_normalized = scaler.fit_transform(self.X)
             self.X = pd.DataFrame(df_normalized, columns=self.X.columns)
-        elif self.normalization_name == 'Nothing':
+        elif self.classifier_name == 'Naive Bayes':
             pass
-            
-    def add_parameter_ui(self):
-        if self.classifier_name == 'SVM':
-            C = st.sidebar.slider('C', 0.01, 15.0)
-            self.params['C'] = C
-            
-        elif self.classifier_name == 'KNN':
-            K = st.sidebar.slider('K', 1, 15)
-            
-            self.params['K'] = K
+            #scaler=RobustScaler()
+            #df_normalized = scaler.fit_transform(self.X)
+            #self.X = pd.DataFrame(df_normalized, columns=self.X.columns)
         elif self.classifier_name == 'Random Forest':
-            max_depth = st.sidebar.slider('max_depth', 2, 15)
-            self.params['max_depth'] = max_depth
-            n_estimators = st.sidebar.slider('n_estimators', 1, 100)
-            self.params['n_estimators'] = n_estimators
-        #elif self.classifier_name == "Naive Bayes":
-            #max_depth = st.sidebar.slider('max_depth', 2, 15)
-            #self.params['max_depth'] = max_depth
-            #n_estimators = st.sidebar.slider('n_estimators', 1, 100)
-            #self.params['n_estimators'] = n_estimators
+            pass
+        elif self.classifier_name == "XGBoost":
+            pass
+        elif self.classifier_name == "Neural Network":
+            scaler = StandardScaler()
+            df_normalized = scaler.fit_transform(self.X)
+            self.X = pd.DataFrame(df_normalized, columns=self.X.columns)
 
     def get_classifier(self):
         if self.classifier_name == 'SVM':
-            #self.clf  = SVC(C=self.params['C'])
             self.clf  = SVC()
         elif self.classifier_name == 'KNN':
-            #self.clf  = KNeighborsClassifier(n_neighbors=self.params['K'])
             self.clf  = KNeighborsClassifier()
         elif self.classifier_name == 'Random Forest':
-            #self.clf  = RandomForestClassifier(n_estimators=self.params['n_estimators'],
-                #max_depth=self.params['max_depth'], random_state=1234)
             self.clf  = RandomForestClassifier()
         elif self.classifier_name == "Naive Bayes":
-            self.clf  = GaussianNB()
-            
-            
+            pass
+        elif self.classifier_name == "XGBoost":
+            self.clf = xgb.XGBClassifier()
+        elif self.classifier_name == "Neural Network":
+            self.clf = Sequential([
+                Dense(15, activation='relu',kernel_regularizer=regularizers.l2(0.01)),
+                Dense(6, activation='relu',kernel_regularizer=regularizers.l2(0.01)),
+                Dense(1, activation='sigmoid')
+            ])
+            self.clf.compile(optimizer=Adam(learning_rate=0.001),
+                          loss=BinaryCrossentropy(),
+                          metrics=['accuracy'])
             
             
     def grid_search(self):
@@ -194,76 +189,93 @@ class App:
             param_grid = {'C': [0.1, 1, 10, 100], 'gamma': [0.001, 0.01, 0.1, 1]}
             self.grid_search1 = GridSearchCV(self.clf, param_grid, cv=5)
         elif self.classifier_name == 'KNN':
-            param_grid = {'n_neighbors': [3, 5, 7]}
+            param_grid = {'n_neighbors': [3,4, 5, 7]}
             self.grid_search1 = GridSearchCV(self.clf, param_grid, cv=5)
         elif self.classifier_name == 'Random Forest':
-            aralik=0.1
-            aralik_son=1.0
+            #aralik=0.1
+            #aralik_son=1.0
             param_grid = {
-                #'n_estimators': [100, 200, 300],
-                'max_depth': range(2,4)
-                #'min_samples_split': [2, 5, 10],
+                #'n_estimators': [200, 300],
+                'max_depth': range(4,6)
+                #'min_samples_split': [1, 2]
                 #'min_samples_leaf': [1, 2, 4]
                 #'min_weight_fraction_leaf': [0.0] + [0.1 * i for i in range(0, int(aralik_son//aralik))]
             }
             self.grid_search1 = GridSearchCV(self.clf, param_grid, cv=5)
+        elif self.classifier_name == "XGBoost":
+            param_grid = {
+                             'learning_rate': [0.1, 0.01, 0.001],
+                             'max_depth': [4],
+                             'n_estimators': [50, 100, 200]
+                         }
+            self.grid_search1 = GridSearchCV(estimator=self.clf, param_grid=param_grid, cv=5, scoring='accuracy', verbose=1)
         elif self.classifier_name == "Naive Bayes":
             self.grid_search1=GaussianNB()
         
         
-        
-        
-    def generate(self):
-        self.get_classifier()
-        #### CLASSIFICATION ####
-        X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.2, random_state=1234)
-        #st.write('xtest:', len(X_test))
-        self.grid_search()
-        self.grid_search1.fit(X_train, y_train)
-        y_pred = self.grid_search1.predict(X_test)
-        
-        
-
+    def confusion_matrix(self):
         st.title('Confusion Matrix')
-        
-        cm = confusion_matrix(y_test, y_pred)
 
-        # Plot confusion matrix as a heatmap
+        cm = confusion_matrix(self.y_test, self.y_pred)
+
+
         plt.figure(figsize=(8, 6))
-        sns.heatmap(cm, annot=True,  fmt='d', cbar=False, cmap="YlGnBu")
+        sns.heatmap(cm, annot=True,  fmt='d', cbar=True, cmap="YlGnBu")
         plt.xlabel("y_pred")
         plt.ylabel("y_test")
         plt.title('Confusion Matrix')
         st.pyplot(plt)
-        st.markdown("---")
-
+        st.markdown("---")  
+        
+           
+    def show_report(self):
         st.title('Reports for the algorithm')
         rounding=5
-        acc =     round(accuracy_score(y_test, y_pred),rounding)
-        f1=       round(f1_score(y_test, y_pred),rounding)
-        precision=round(precision_score(y_test, y_pred),rounding)
-        recall=   round(recall_score(y_test, y_pred),rounding)
+        acc =     round(accuracy_score(self.y_test, self.y_pred),rounding)
+        f1=       round(f1_score(self.y_test, self.y_pred),rounding)
+        precision=round(precision_score(self.y_test, self.y_pred),rounding)
+        recall=   round(recall_score(self.y_test, self.y_pred),rounding)
+        
 
         #st.write(f'Classifier = {self.classifier_name}')
         #st.write(f'Accuracy Score: {acc:.3f}')
         #st.write(f'F1 Score: {f1:.3f}')
         #st.write(f'Precision Score: {precision:.3f}')
         #st.write(f'Recall Score: {recall:.3f}')
-        st.write(f'Classifier = {self.classifier_name}')
-        st.write(f'Accuracy Score: ',acc)
-        st.write(f'F1 Score: ',f1)
-        st.write(f'Precision Score: ',precision)
-        st.write(f'Recall Score: ',recall)
+        st.write(f'##### Classifier = {self.classifier_name}')
+        st.write(f'##### Accuracy Score: ',acc)
+        st.write(f'##### F1 Score: ',f1)
+        st.write(f'##### Precision Score: ',precision)
+        st.write(f'##### Recall Score: ',recall)
+        
+        if self.classifier_name=="Neural Network":
+            pass
+
+        else:
+            st.write('## Best Parameters')
+            if self.classifier_name == "Naive Bayes":
+                st.write("##### GridSearch wasn't applied to Naive Bayes Algorithm. Because there is no hyperparameter.")
+            else:
+                for key, value in self.grid_search1.best_params_.items():
+                    st.write(f"##### {key}: {value}")
         
         
-        #### PLOT DATASET ####
-        # Project the data onto the 2 primary principal components
-        #pca = PCA(2)
-        #X_projected = pca.fit_transform(self.X)
-        #x1 = X_projected[:, 0]
-        #x2 = X_projected[:, 1]
-        #fig = plt.figure()
-        #plt.scatter(x1, x2,
-        #        c=self.y, alpha=0.8,
-        #        cmap='viridis')
-        #st.pyplot(fig)
+    def create_model(self):
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.2, random_state=1234)
+        #st.write('xtest:', len(X_test))
+        self.get_classifier()
+        if self.classifier_name=="Neural Network":
+            self.clf.fit(self.X_train, self.y_train, epochs=200, verbose=1, validation_split=0.1)
+            y_pred = self.clf.predict(self.X_test)
+            #y_pred = tf.math.sigmoid(y_pred)
+            self.y_pred = (y_pred > 0.5)
+
+        else:
+            self.grid_search()
+            self.grid_search1.fit(self.X_train, self.y_train)
+            self.y_pred = self.grid_search1.predict(self.X_test)
+
+        
+        self.confusion_matrix()
+        self.show_report()
+ 
