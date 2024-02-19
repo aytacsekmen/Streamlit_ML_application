@@ -3,3 +3,7 @@ matplotlib
 scikit-learn
 pandas
 seaborn
+xgboost
+keras
+tensorflow
+numpy
