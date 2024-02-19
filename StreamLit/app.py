@@ -63,6 +63,7 @@ class App:
             st.write('# Verisetinin ilk 10 satırı:', data.head(10))
             st.markdown("---")
             st.write('# Verisetinin sütunları:', data.columns)
+            #st.table(data.columns)
             data.drop(['id','Unnamed: 32'], inplace= True, axis = 1)
             st.markdown("---")
             st.write('# Gereksiz sütunları sildikten sonra verisetinin son 10 satırı:', data.tail(10))
